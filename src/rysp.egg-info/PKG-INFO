@@ -1,0 +1,50 @@
+Metadata-Version: 2.1
+Name: rysp
+Version: 1.0.0
+Summary: Rydberg Simulation Platform: Simulation platform for neutral atom quantum computers
+Author-email: Servaas Kokkelmans <s.kokkelmans@tue.nl>, Robert de Keijzer <r.j.p.t.d.keijzer@tue.nl>, Jasper Postema <j.j.postema@tue.nl>, Madhav Mohan <m.mohan@tue.nl>, Guus Bertens <a.c.m.bertens@tue.nl>, Raul Santos <r.f.parcelas.resina.dos.santos@tue.nl>
+Project-URL: Homepage, https://gitlab.tue.nl/20235021/rsp
+Project-URL: Bug Tracker, https://gitlab.tue.nl/20235021/rsp/-/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+Requires-Dist: ARC-Alkali-Rydberg-Calculator
+Requires-Dist: numpy
+Requires-Dist: qutip
+Requires-Dist: scipy
+Requires-Dist: pathos
+Requires-Dist: pulser
+Provides-Extra: dev
+Requires-Dist: astar; extra == "dev"
+Requires-Dist: pylint; extra == "dev"
+Provides-Extra: doc
+Requires-Dist: sphinx; extra == "doc"
+Requires-Dist: sphinx-rtd-theme; extra == "doc"
+Requires-Dist: sphinx-autobuild; extra == "doc"
+Provides-Extra: utils
+Requires-Dist: pandas; extra == "utils"
+Requires-Dist: matplotlib; extra == "utils"
+Requires-Dist: ipykernel; extra == "utils"
+Requires-Dist: ipywidgets; extra == "utils"
+Requires-Dist: seaborn; extra == "utils"
+Requires-Dist: networkx; extra == "utils"
+Provides-Extra: opt-control
+Requires-Dist: qctrl; extra == "opt-control"
+Requires-Dist: qctrl-visualizer; extra == "opt-control"
+
+# Rydberg Simulation Platform - RySP
+
+## Description
+
+Simulation of Rydberg atom physics for a neutral atom quantum computing digital twin. Designed with usability and versatility in mind.
+
+
+## Getting Started
+
+### Installing the repository using pip
+
+```
+pip install 'git://github.com/Rualito/RySP.git'
+```
+

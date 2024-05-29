@@ -1,0 +1,18 @@
+\documentclass[10pt, margin=0.1in]{standalone}
+\usepackage{braket}
+\usepackage[compat=0.4]{yquant}
+\usetikzlibrary{quotes}
+\begin{document}
+    \begin{tikzpicture}
+        \begin{yquant*}
+		qubit {$|q_A\rangle$} q_A;
+		qubit {$|q_B\rangle$} q_B;
+		box {$X$} q_A;
+		box {$X$} q_B;
+		box {$CC$} (q_A, q_B);
+		box {$X$} q_B;
+		box {$X$} q_A;
+
+        \end{yquant*}
+    \end{tikzpicture}
+\end{document}

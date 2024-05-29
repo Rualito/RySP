@@ -1,0 +1,80 @@
+
+[project]
+name = "rysp"
+version = "1.0.0"
+authors = [
+  {name="Servaas Kokkelmans", email="s.kokkelmans@tue.nl"},
+  {name="Robert de Keijzer", email="r.j.p.t.d.keijzer@tue.nl"},
+  {name="Jasper Postema", email="j.j.postema@tue.nl"},
+  {name="Madhav Mohan", email="m.mohan@tue.nl"},
+  {name="Guus Bertens", email="a.c.m.bertens@tue.nl"},
+  {name="Raul Santos", email="r.f.parcelas.resina.dos.santos@tue.nl"},
+]
+description = "Rydberg Simulation Platform: Simulation platform for neutral atom quantum computers"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  # FIXME: there is a large discrepancy between the packages that are imported
+  # in the code, vs the list of packages that is in README.md.
+  "ARC-Alkali-Rydberg-Calculator",
+  # "h5py",
+  # "matplotlib",
+  #"miniutils",
+  # "numba",
+  "numpy",
+  "qutip",
+  "scipy",
+  "pathos",
+  "pulser",
+]
+
+[project.optional-dependencies]
+dev = [
+  "astar",
+  "pylint",
+]
+doc = [
+  "sphinx",
+  "sphinx-rtd-theme",
+  "sphinx-autobuild"
+]
+utils = [
+  "pandas",
+  "matplotlib",
+  "ipykernel",
+  "ipywidgets",
+  "seaborn",
+  "networkx"
+]
+opt-control = [
+  "qctrl",
+  "qctrl-visualizer",
+]
+
+
+# [project.urls]
+# "Homepage" = "https://gitlab.tue.nl/20235021/rsp"
+# "Bug Tracker" = "https://gitlab.tue.nl/20235021/rsp/-/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+namespaces = true
+where = ["src"]
+# where = ["src"]
+# include = ["rsp.core*"]
+
+[tool.setuptools.package-data]
+"rysp.core.physics.atom_data" =["*.csv"]
+"rysp.core.physics.electron_wf" =["*.npy"]
+
+
