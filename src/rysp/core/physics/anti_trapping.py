@@ -1,11 +1,4 @@
-
-
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jan 13 09:13:59 2023
-
-@author: s165827
-"""
 
 import math
 import rysp.core.physics.constants as cst

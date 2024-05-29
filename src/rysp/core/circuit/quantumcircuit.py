@@ -81,7 +81,7 @@ class CircuitComponent(Operation):
     def _to_latex_yquant(self, target_registers, replace_plots=[], **kwargs):
         gate_latex = self.operation._to_latex_yquant(
             target_registers=target_registers, **kwargs)
-        args = re.findall('(?<=(?<!\{)\{)[^{}]*(?=\}(?!\}))', gate_latex)
+        args = re.findall(r'(?<=(?<!\{)\{)[^{}]*(?=\}(?!\}))', gate_latex)
 
         format_dict = {a: f'{{{a}}}' for a in args}
         target_is_control_index = 0

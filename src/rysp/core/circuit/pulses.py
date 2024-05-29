@@ -1,3 +1,5 @@
+
+
 from typing import Any
 
 import numpy as np
@@ -8,14 +10,17 @@ from pulser.waveforms import InterpolatedWaveform, ConstantWaveform
 from rysp.core.circuit.operations import CustomGate, ParametrizedOperation
 from ..experiment.atomsystem import AtomSystem
 
+from numba import njit
 
+
+@njit
 def _evaluate_array_interpolation(arr: np.ndarray, t0: float, tf: float, t: float):
     # Assuming linear time scalling
     idx = (t-t0)/(tf-t0) * (len(arr)-1)
     if t < t0:
-        return arr[0]
+        return 0
     if t > tf:
-        return arr[-1]
+        return 0
 
     x1 = max(0, min(int(np.ceil(idx)), len(arr)-1))
     x0 = max(0, min(int(np.floor(idx)), len(arr)-1))
@@ -29,7 +34,76 @@ def _evaluate_array_interpolation(arr: np.ndarray, t0: float, tf: float, t: floa
         return output
 
 
-# TODO: 'with' statements make sense? call __enter__() and __exit__() methods for initialization (add channels) and exiting (compile)
+@njit
+def pulse_compile(time_list, start_times, durations, amps_list, dets_list, phases):
+    total_steps = len(time_list)
+    samples_amp = np.zeros(total_steps, dtype=np.complex64)
+    samples_det = np.zeros(total_steps, dtype=np.float64)
+    t0 = start_times[0]
+    # print("Compiling pulse")
+    for i, ti in enumerate(time_list):
+        # ti = i*self.time_resolution
+        if ti > t0:
+            for st, dr, amps, dets, phase in zip(start_times, durations, amps_list, dets_list, phases):
+                # if pulse is still active
+                tp0 = st  # pulse start time
+                tpf = st+dr  # pulse end time
+
+                if (ti > tp0) and (ti < tpf):
+                    # Add amplitude samples
+                    samples_amp[i] += _evaluate_array_interpolation(
+                        amps, tp0, tpf, ti) * np.exp(1.0j * phase)
+
+                    # Can just add the detunings
+                    samples_det[i] += _evaluate_array_interpolation(
+                        dets, tp0, tpf, ti)
+    return samples_amp, samples_det
+
+
+@njit
+def get_compatible_timelist(intervals):
+    # total_steps = len(time_list)
+    # find start time
+    # find end time
+    # find keytimes
+    # start time, final time, time scale
+    key_times = []
+    for t0, tf, ts in intervals:
+        key_times.append(t0)
+        key_times.append(tf)
+        # if (t0,tf) not in scales:
+        #     scales[(t0, tf)] = []
+    #     scales[t0] = (ts, 0)
+    #     scales[tf]
+    key_times = sorted(list(set(key_times)))  # sort the list of unique times
+    # print(key_times)
+    scales = []
+    for k, tk in enumerate(key_times[:-1]):
+        valid_scales = []
+        for t0, tf, ts in intervals:
+            if (tk >= t0) and (tk < tf):
+                valid_scales.append(ts)
+        if len(valid_scales) == 0:
+            scales.append((scales[-1]+key_times[k+1])/2)
+            continue
+
+        # print(f"Scale: ", valid_scales)
+        dt = key_times[k+1] - tk
+        steps = max(2, int(dt/min(valid_scales)))
+        time_list = np.linspace(tk, key_times[k+1], steps)
+        if k == 0:
+            for j, tj in enumerate(time_list):
+                scales.append(tj)
+        elif scales[-1] == time_list[0]:
+            for j, tj in enumerate(time_list[1:]):
+                scales.append(tj)
+        else:
+            scales.append((scales[-1]+time_list[0])/2)
+            for j, tj in enumerate(time_list):
+                scales.append(tj)
+    return np.array(scales)
+
+
 class PulseSequence:  # TODO: PulseSequence docstring
     '''
     Pulse sequence class. 
@@ -68,11 +142,11 @@ class PulseSequence:  # TODO: PulseSequence docstring
         if experiment.simulation_level != 'pulsed':
             raise ValueError(
                 "PulseSequence: Provided experiment config is not pulse based.")
-        # TODO: PulseSequence.validate_sequence - check pulse concurrence
 
     def add_pulse(self, pulse,
                   channel: str,
                   target: str | int,
+                  time_scale=1e-9,
                   t0=0):
         '''
         :param pulse: Pulse to add to the channel
@@ -97,7 +171,7 @@ class PulseSequence:  # TODO: PulseSequence docstring
             self.max_time = t0 + pulse.duration*1e-9
         self.duration = self.max_time - self.start_time
 
-        self.pulse_intervals += [(t0, t0+pulse.duration*1e-9)]
+        self.pulse_intervals += [(t0, t0+pulse.duration*1e-9, time_scale)]
         self.pulse_intervals_pos += [(channel, target,
                                       len(self.sequence[(channel, target)])-1)]
 
@@ -112,6 +186,8 @@ class PulseSequence:  # TODO: PulseSequence docstring
                 self.sequence[key][i] = (el[0]+dt, el[1], el[2])
         for i, st in enumerate(self.start_times):
             self.start_times[i] = st+dt
+        for i, (t0, tf, ts) in enumerate(self.pulse_intervals):
+            self.pulse_intervals[i] = (t0+dt, tf+dt, ts)
         self.start_time = self.start_time + dt
         self.max_time += dt
 
@@ -124,8 +200,11 @@ class PulseSequence:  # TODO: PulseSequence docstring
         self._prepare_compile()
         self.pulses = {}
         total_steps = len(time_list)
-        delta = time_list[-1] - time_list[-2]
+        delta = time_list[1] - time_list[0]
+        # adding safe padding to both sides
         self.time_list = time_list
+        # np.pad(time_list, (0,1), mode='constant',
+        #                         constant_values=[-delta, time_list[-1]+delta])+delta
         self.time_resolution = None
         for ch, tgt in self.sequence:
             ordered_pulses = sorted(
@@ -133,24 +212,15 @@ class PulseSequence:  # TODO: PulseSequence docstring
             samples_amp = np.zeros(total_steps, dtype=np.complex64)
             samples_det = np.zeros(total_steps, dtype=np.float64)
             t0 = ordered_pulses[0][0]  # start time
-            for i, ti in enumerate(time_list):
-                # ti = i*self.time_resolution
-                if ti > t0:
-                    # add samples for all pulses
-                    for ps in ordered_pulses:
-                        # if pulse is still active
-                        tp0 = ps[0]  # pulse start time
-                        tpf = ps[0]+ps[1]  # pulse end time
+            samples_amp, samples_det = pulse_compile(time_list,
+                                                     [op[0]
+                                                         for op in ordered_pulses],
+                                                     [op[1]
+                                                         for op in ordered_pulses],
+                                                     [op[2].amplitude.samples for op in ordered_pulses],
+                                                     [op[2].detuning.samples for op in ordered_pulses],
+                                                     [op[2].phase for op in ordered_pulses])
 
-                        if (ti > tp0) and (ti < tpf):
-                            # Add amplitude samples
-                            samples_amp[i] += _evaluate_array_interpolation(
-                                ps[2].amplitude.samples, tp0, tpf, ti) * np.exp(1.0j * ps[2].phase)
-                            # Add detuning samples
-
-                            # Can just add the detunings
-                            samples_det[i] += _evaluate_array_interpolation(
-                                ps[2].detuning.samples, tp0, tpf, ti)
             self.pulses[(ch, tgt)] = {'amp': samples_amp,
                                       'det': samples_det}
 
@@ -182,7 +252,7 @@ class PulseSequence:  # TODO: PulseSequence docstring
             raise ValueError(
                 "PulseSequence: st0 != start_time, internal error!!")
 
-    def _compile_pulses(self, time_resolution=1e-8):  # ns resolution
+    def _compile_pulses(self, time_resolution=1e-8, adapt=True):  # ns resolution
         '''
         For every channel/target, get the compiled waveform from the corresponding samples.
         Compiles the pulse for a standard time scale
@@ -190,12 +260,17 @@ class PulseSequence:  # TODO: PulseSequence docstring
         '''
         self._prepare_compile()
 
-        self.time_resolution = time_resolution
+        # self.time_resolution = time_resolution
 
         # warnings.warn("Cannot add complex phases in the current implementation.
         # Output has constant phase, taken to be the average over the whole pulse.")
-        self._convert_pulse_list(
-            np.arange(0, self.duration+self.time_resolution, self.time_resolution))
+        if adapt:
+            timelist = get_compatible_timelist(self.pulse_intervals)
+        else:
+            num_steps = int(np.ceil(self.duration/time_resolution))
+            timelist = np.linspace(0, self.duration, num_steps)
+
+        self._convert_pulse_list(timelist)
 
 
 class PulsedGate(PulseSequence, CustomGate):  # TODO: PulsedGate docstring
@@ -316,11 +391,17 @@ def Pulse_from_file(amplitudes: np.ndarray,
     if normalize:
         amps = amps/np.max(amplitudes)
         dets = dets/np.max(amplitudes)
-    return Pulse(amplitude=InterpolatedWaveform(int(duration), amps,
-                                                interpolator='interp1d', kind=interpkind),
-                 detuning=InterpolatedWaveform(int(duration), dets,
-                                               interpolator='interp1d', kind=interpkind),
-                 phase=0)
+    if np.max(np.abs(dets)) < 1e-8:
+        return Pulse(amplitude=InterpolatedWaveform(int(duration), amps,
+                                                    interpolator='interp1d', kind=interpkind),
+                     detuning=ConstantWaveform(int(duration), 0),
+                     phase=0)
+    else:
+        return Pulse(amplitude=InterpolatedWaveform(int(duration), amps,
+                                                    interpolator='interp1d', kind=interpkind),
+                     detuning=InterpolatedWaveform(int(duration), dets,
+                                                   interpolator='interp1d', kind=interpkind),
+                     phase=0)
 
 
 class ParametrizedPulsedGate(ParametrizedOperation):

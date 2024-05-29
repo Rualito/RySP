@@ -1,4 +1,5 @@
 ARC-Alkali-Rydberg-Calculator
+numba
 numpy
 qutip
 scipy

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Jun 23 13:28:05 2022
-
-@author: robert
-"""
 
 import numpy as np
 import rysp.core.physics.constants as cst

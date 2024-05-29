@@ -12,9 +12,9 @@ class ExperimentSetup:
     Defines hardware parameters depending on the configuration file
     '''
 
-    def __init__(self, json_str: str, simulation_method='qutip', _atom_type=AtomInTrap) -> None:
+    def __init__(self, json_str: str, simulation_method='qutip') -> None:
         self._data = json.loads(json_str)
-        self._atomtype = _atom_type
+        # self._atomtype = _atom_type
 
         self.name = self._data['name']
         self.simulation_level = self._data['simulation_level']
@@ -44,29 +44,25 @@ class ExperimentSetup:
             det: standard laser detuning
             '''
             # State as string to atomic parameters
-            satom0 = self.atom['states'][s0][:4]
-            satom1 = self.atom['states'][s1][:4]
+            satom0 = self.atom['states'][s0]
+            satom1 = self.atom['states'][s1]
 
-            ediff = rabicalc.get_energy_diff([*satom0, *satom1])
-            wavelength = units.freq_to_wavelength(ediff + det)
-            freq = units.wavelength_to_freq(wavelength)
+            ediff = rabicalc.get_energy_diff(tuple([*satom0, *satom1]))
 
-            return freq
+            return ediff + det
         self.transition_offresonance_scattering = {}
         self.rabi_freq = {}
 
         for transition, laser in self.qubit_lasers.items():
-            satom0 = list(self.atom['states'][transition[0]]
-                          [:3])+[self.atom['states'][transition[0]][4]]
-            satom1 = list(self.atom['states'][transition[1]]
-                          [:3])+[self.atom['states'][transition[1]][4]]
+            satom0 = self.atom['states'][transition[0]]
+            satom1 = self.atom['states'][transition[1]]
 
             intensity = 2*laser['power']/(np.pi*laser['waist']**2)
 
-            rate0, rate1, s1, s2 = rabicalc.total_off_resonance_scattering_rate_calc(
+            rate0, rate1, s0, s1 = rabicalc.total_off_resonance_scattering_rate_calc(
                 transition=[*satom0, *satom1],
                 frequency=transition_to_freq(
-                    transition[0], transition[1], laser['detuning']),
+                    transition[0], transition[1], laser['detuning']*0),
                 I=intensity
             )
 
@@ -80,25 +76,71 @@ class ExperimentSetup:
                     intensity, self.magnetic_field)
             else:
                 self.rabi_freq[tuple(transition)] = rabicalc.rabi_frequency_calc_trans(
-                    [*satom0, *satom1], intensity)
+                    tuple([*satom0, *satom1]), intensity)
 
         self.dephase_rates = {}
         for tr in self.available_transitions:
-            self.dephase_rates[tr] = np.sqrt(
-                self.qubit_lasers[tr]['line width'])  # doppler broadening
+            s0, s1 = tr[0], tr[1]
+            satom0 = self.atom['states'][s0]  # atom state 0
+            satom1 = self.atom['states'][s1]  # atom state 1
+            decay_rate = rabicalc.decay_rate_state(satom1)
+            self.dephase_rates[tr] = np.sqrt(decay_rate)
+
+            # np.sqrt(
+            #   self.qubit_lasers[tr]['line width'])
+
+        self.loss_rates = {st: 0.0 for st in self.atom['states']}
+
+        self.default_C6 = 0.0
 
         self.simulation_method = simulation_method
 
     @classmethod
-    def fromFile(cls, filename, simulation_method='qutip', _atom_type=AtomInTrap):
+    def fromFile(cls, filename, simulation_method='qutip'):
 
         with open(filename, 'r') as file:
             data = file.read().replace('\n', '')
-        return ExperimentSetup(data, simulation_method, _atom_type)
+        return cls(data, simulation_method)
 
     def validate_gate(self, gate, targets):
         raise NotImplementedError(
             "Cannot validate gate, hardware method not yet implemented.")
+
+    def show_physical_parameters(self):
+        """
+        show_physical_parameters Shows the estimated physical parameters for simulation and gives indications on how to customize them
+
+        """
+        for transition in self.qubit_lasers:
+            print(f"\nTransition: {transition} ")
+            print(f"\tRabi Frequency: {self.rabi_freq[(*transition,)]:g} Hz")
+            print(
+                "\t\tdefines the maximum Rabi frequency associated with the max laser intensity. \n\t\tIt gives the units for the transition and detuning terms")
+            print(
+                f"\t\tchange it with the attribute exp.rabi_freq[{(*transition,)}]")
+            print(
+                f"\tDecay rate Γ: {self.dephase_rates[(*transition,)]**2:g} Hz")
+            print(
+                f"\tDephase rate γ (√Γ): {self.dephase_rates[(*transition,)]:g} √Hz")
+            print("\t\tIntroduces collapse operators on the Lindbladian evolution.")
+            print(
+                f"\t\tchange it with the attribute exp.dephase_rates[{(*transition,)}]")
+            print("\tOffresonance scattering rates:")
+            for st in transition:
+                print(
+                    f"\t\tfrom state {st}: {self.transition_offresonance_scattering[(*transition,)][st]:g} Hz")
+            print(
+                "\t\tAdds loss terms to the Lindbladian that are active during a pulse,\n\t\t and are integrated a posteriori.")
+            print(
+                f"\t\tchange it with the attribute exp.transition_offresonance_scattering[{(*transition,)}]['{transition[0]}' or '{transition[1]}']")
+
+        print("\nThe C6 terms are defined on a per atom basis.\n If you want to customize the |rrXrr| interaction term (C6_rr) you may set exp.default_C6")
+
+        print("\nState loss rate")
+        for st in self.atom['states']:
+            print(f"\tState '{st}': {self.loss_rates[st]:g} Hz")
+        print("\t\tThese are 0 by default. They define rates of transition to states outside the computational basis, and can be computed a posteriori.")
+        print(f"\t\tChange it with exp.loss_rates[ 'state' ]")
 
     def get_trap_params(self):
         w0 = self.trap_laser_info['waist']
@@ -121,14 +163,18 @@ class ExperimentSetup:
             raise ValueError(
                 f"Hardware setup: Atom unknown: {self.atom['species']}")
 
-        return self._atomtype({'name': atom.elementName, 'mass': atom.mass},
-                              trap_site=self.get_trap_params(),
-                              state="ground_state",
-                              spin_basis=[*self.atom['states'].values()],
-                              spin_basis_labels=[*self.atom['states'].keys()],
-                              motional_basis=[*self.atom['motional'].values()],
-                              motional_basis_labels=[
-                                  *self.atom['motional'].keys()],
-                              Temp=self.atom['temperature'],
-                              interact_states=['r']
-                              )
+        atom = AtomInTrap({'name': atom.elementName, 'mass': atom.mass},
+                          trap_site=self.get_trap_params(),
+                          state="ground_state",
+                          spin_basis=[*self.atom['states'].values()],
+                          spin_basis_labels=[*self.atom['states'].keys()],
+                          motional_basis=[*self.atom['motional'].values()],
+                          motional_basis_labels=[
+            *self.atom['motional'].keys()],
+            Temp=self.atom['temperature'],
+            interact_states=['r']
+        )
+
+        if self.default_C6 == 0.0:
+            atom.c6_coef_dict[('r', 'r')] = self.default_C6
+        return atom

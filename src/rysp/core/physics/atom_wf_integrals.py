@@ -1,9 +1,4 @@
 
-"""
-Created on Fri Mar 11 15:16:38 2022
-
-@author: s165827
-"""
 import warnings
 import functools
 from qutip.qip.gates import expand_operator

@@ -3,13 +3,12 @@ Name: rysp
 Version: 1.0.0
 Summary: Rydberg Simulation Platform: Simulation platform for neutral atom quantum computers
 Author-email: Servaas Kokkelmans <s.kokkelmans@tue.nl>, Robert de Keijzer <r.j.p.t.d.keijzer@tue.nl>, Jasper Postema <j.j.postema@tue.nl>, Madhav Mohan <m.mohan@tue.nl>, Guus Bertens <a.c.m.bertens@tue.nl>, Raul Santos <r.f.parcelas.resina.dos.santos@tue.nl>
-Project-URL: Homepage, https://gitlab.tue.nl/20235021/rsp
-Project-URL: Bug Tracker, https://gitlab.tue.nl/20235021/rsp/-/issues
 Classifier: Programming Language :: Python :: 3
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 Requires-Dist: ARC-Alkali-Rydberg-Calculator
+Requires-Dist: numba
 Requires-Dist: numpy
 Requires-Dist: qutip
 Requires-Dist: scipy

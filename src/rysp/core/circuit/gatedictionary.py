@@ -20,16 +20,32 @@ class GateDictionary:
     """
     _complex_parametrized_gates = ['CRX', 'CRZ', 'CRY']
 
-    def __init__(self, experiment: ExperimentSetup):
+    def __init__(self, experiment: ExperimentSetup, time_factor=2e-2):
         self._experiment = experiment
-        self.duration_clock = int(1/experiment.rabi_freq[('0', '1')] * 1e9)
-        self.duration_ryd = int(1/experiment.rabi_freq[('1', 'r')] * 1e9)
+        # Duration of a rabi flop
+        self.time_factor = time_factor
+        self.duration_clock = 1/experiment.rabi_freq[('0', '1')] * 1e9
+        self.duration_ryd = 1/experiment.rabi_freq[('1', 'r')] * 1e9
 
-    def _add_constant_pulse(self, pgate: PulsedGate, channel, duration, phase, tgt=0, detuning=0):
-        pgate.add_pulse(pulse=Pulse(amplitude=ConstantWaveform(int(duration), phase),
-                        detuning=ConstantWaveform(int(duration), detuning), phase=0),
-                        channel=channel,
-                        target=tgt)
+    def _add_constant_pulse(self, pgate: PulsedGate, channel, duration, phase, tgt=0, detuning=0, time_factor=None):
+        # rabi intensity is at most 1, but area must be kept constant
+        # detuning is a multiple of the amplitude
+        time_factor = time_factor or self.time_factor
+        area = duration * phase
+        int_duration = int(area) or int(duration)
+
+        if phase != 0:
+            pgate.add_pulse(pulse=Pulse(amplitude=ConstantWaveform(int_duration, 1),
+                                        detuning=ConstantWaveform(int_duration, detuning), phase=0),
+                            channel=channel, target=tgt,
+                            time_scale=time_factor*int_duration*1e-9)
+
+        else:
+            pgate.add_pulse(pulse=Pulse(amplitude=ConstantWaveform(int_duration, 0),
+                                        detuning=ConstantWaveform(int_duration, detuning), phase=0),
+                            channel=channel, target=tgt,
+                            time_scale=time_factor*int_duration*1e-9)
+
         return pgate
 
     def RX(self, transition, phi, size=1, p: PulsedGate | None = None, target=0, align=False) -> PulsedGate:

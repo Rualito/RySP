@@ -1,16 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Mar 18 15:09:42 2022
-
-@author: s165827
-"""
-
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Mar 10 13:27:23 2022
-
-@author: s165827
-"""
 
 
 # Load in all the energies (in cm^(-1)) and RDME (in a.u.)

@@ -23,6 +23,12 @@ src/rysp/core/physics/constants.py
 src/rysp/core/physics/rabicalc.py
 src/rysp/core/physics/sr88.py
 src/rysp/core/physics/units.py
+src/rysp/core/physics/atom_data/Sr88_dipole_matrix_elements_energies.csv
+src/rysp/core/physics/atom_data/Sr88_dipole_matrix_elements_energies_rydberg.csv
+src/rysp/core/physics/electron_wf/ElectronPolFactors.npy
+src/rysp/core/physics/electron_wf/ElectronWaveFuncM.npy
+src/rysp/core/physics/electron_wf/ElectronWaveFuncMNorm.npy
+src/rysp/core/physics/electron_wf/endcoeff.npy
 src/rysp/core/simulation/__init__.py
 src/rysp/core/simulation/hamiltonian.py
 src/rysp/core/simulation/hamiltonian_expansions.py
